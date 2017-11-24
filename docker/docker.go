@@ -3,6 +3,8 @@ package docker
 import (
 	"fmt"
 	"math/rand"
+	"net"
+	"sync"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -22,11 +24,16 @@ var (
 	pumbaClient container.Client
 )
 
-type DockerCLI struct{} //FIXME: we could only use PumbaCLI, which also instantiate a DockerCLI
+type DockerCLI struct {
+	mux sync.Mutex
+} //FIXME: we could only use PumbaCLI, which also instantiate a DockerCLI
 
-type PumbaCLI struct{}
+type PumbaCLI struct {
+	mux sync.Mutex
+}
 
 func (c *DockerCLI) NewDockerCLI() { //FIXME: we could only use PumbaCLI, which also instantiate a DockerCLI
+	c.mux.Lock()
 	if docker == nil {
 		cli, err := client.NewEnvClient()
 		if err != nil {
@@ -34,15 +41,18 @@ func (c *DockerCLI) NewDockerCLI() { //FIXME: we could only use PumbaCLI, which 
 		}
 		docker = cli
 	}
+	c.mux.Unlock()
 }
 
 func (c *PumbaCLI) NewPumbaCLI() {
+	c.mux.Lock()
 	if pumbaChaos == nil {
 		pumbaChaos = pumba.NewChaos()
 	}
 	if pumbaClient == nil {
 		pumbaClient = container.NewEnvClient()
 	}
+	c.mux.Unlock()
 }
 
 //FIXME: we should reuse the function provided by Pumba (e.g. so as to implement any new action requiring to exec into containers)
@@ -88,6 +98,99 @@ func (c *PumbaCLI) NewPumbaCLI() {
 	return nil
 }*/
 
+/*Limit network rate to  v kbit/s for traffic  on all containers*/
+type NetworkRate struct {
+	actions.Action
+	DockerCLI
+	PumbaCLI
+}
+
+func (a NetworkRate) Do(v int64) {
+	a.NewDockerCLI()
+	a.NewPumbaCLI()
+
+	a.DockerCLI.mux.Lock()
+	containers, err := docker.ContainerList(context.Background(), types.ContainerListOptions{})
+	a.DockerCLI.mux.Unlock()
+	if err != nil {
+		panic(err)
+	}
+
+	cmd := pumba.CommandNetemRate{
+		NetInterface: "eth0",
+		IPs:          []net.IP{net.IPv4(255, 255, 255, 255)},
+		Duration:     a.Action.Duration,
+		Rate:         fmt.Sprintf("%dkbit", v),
+		Image:        "",
+	}
+
+	for _, container := range containers {
+		a.DockerCLI.mux.Lock()
+		info, _ := docker.ContainerInspect(context.Background(), container.ID)
+		a.DockerCLI.mux.Unlock()
+		if container.Labels["protected"] != "true" {
+			go func() {
+				fmt.Println("Container", info.Name, "will have limited network rate down to", cmd.Rate, "kbit/s for", cmd.Duration)
+				a.PumbaCLI.mux.Lock()
+				err := pumbaChaos.NetemRateContainers(context.Background(), pumbaClient, []string{info.Name}, "", cmd)
+				a.PumbaCLI.mux.Unlock()
+				if err != nil {
+					fmt.Println("Error:", err)
+				}
+			}()
+		} else {
+			fmt.Println("container", info.Name, "is protected")
+		}
+	}
+}
+
+/*Drops v% of incoming packet on all containers*/ //TODO: make an action targeting specific/random sub-sets of containers
+type PacketDelay struct {
+	actions.Action
+	DockerCLI
+	PumbaCLI
+}
+
+func (a PacketDelay) Do(v int64) {
+	a.NewDockerCLI()
+	a.NewPumbaCLI()
+
+	a.DockerCLI.mux.Lock()
+	containers, err := docker.ContainerList(context.Background(), types.ContainerListOptions{})
+	a.DockerCLI.mux.Unlock()
+	if err != nil {
+		panic(err)
+	}
+
+	cmd := pumba.CommandNetemDelay{
+		NetInterface: "eth0",
+		IPs:          []net.IP{net.IPv4(255, 255, 255, 255)},
+		Duration:     a.Action.Duration,
+		Time:         int(v),
+		Jitter:       int(v / 10),
+		Correlation:  25,
+	}
+
+	for _, container := range containers {
+		a.DockerCLI.mux.Lock()
+		info, _ := docker.ContainerInspect(context.Background(), container.ID)
+		a.DockerCLI.mux.Unlock()
+		if container.Labels["protected"] != "true" {
+			go func() {
+				fmt.Println("Container", info.Name, "will delay packets with", cmd.Time, "with jitter", cmd.Jitter, "for", cmd.Duration)
+				a.PumbaCLI.mux.Lock()
+				err := pumbaChaos.NetemDelayContainers(context.Background(), pumbaClient, []string{info.Name}, "", cmd)
+				a.PumbaCLI.mux.Unlock()
+				if err != nil {
+					fmt.Println("Error:", err)
+				}
+			}()
+		} else {
+			fmt.Println("container", info.Name, "is protected")
+		}
+	}
+}
+
 /*Drops v% of incoming packet on all containers*/ //TODO: make an action targeting specific/random sub-sets of containers
 type PacketLoss struct {
 	actions.Action
@@ -96,30 +199,41 @@ type PacketLoss struct {
 }
 
 func (a PacketLoss) Do(v int64) {
+	fmt.Println("DEBUG")
 	a.NewDockerCLI()
 	a.NewPumbaCLI()
 
+	a.DockerCLI.mux.Lock()
 	containers, err := docker.ContainerList(context.Background(), types.ContainerListOptions{})
+	a.DockerCLI.mux.Unlock()
 	if err != nil {
 		panic(err)
 	}
 
 	cmd := pumba.CommandNetemLossRandom{
 		NetInterface: "eth0",
-		IPs:          nil,
-		Duration:     1 * time.Millisecond,
-		Percent:      11.5,
-		Correlation:  25.53,
+		IPs:          []net.IP{net.IPv4(255, 255, 255, 255)},
+		Duration:     a.Action.Duration,
+		Percent:      float64(v),
+		Correlation:  25,
 	}
 
 	for _, container := range containers {
+		a.DockerCLI.mux.Lock()
+		info, _ := docker.ContainerInspect(context.Background(), container.ID)
+		a.DockerCLI.mux.Unlock()
 		if container.Labels["protected"] != "true" {
-			err := pumbaChaos.NetemLossRandomContainers(context.Background(), pumbaClient, []string{container.Names[0]}, "", cmd)
-			if err != nil {
-				fmt.Println("Error:", err)
-			}
+			go func() {
+				fmt.Println("Container", info.Name, "will drop", cmd.Percent, "percent of packets for", cmd.Duration)
+				a.PumbaCLI.mux.Lock()
+				err := pumbaChaos.NetemLossRandomContainers(context.Background(), pumbaClient, []string{info.Name}, "", cmd)
+				a.PumbaCLI.mux.Unlock()
+				if err != nil {
+					fmt.Println("Error:", err)
+				}
+			}()
 		} else {
-			fmt.Println("container", container.Names[0], "is protected")
+			fmt.Println("container", info.Name, "is protected")
 		}
 	}
 }
@@ -178,12 +292,18 @@ func (a RestartContainer) Do(v int64) {
 		var i int64 = 0
 		for i < v {
 			id := r.Int() % len(containers) //FIXME: ensure that we get different IDs (currently, could be n times the same)
-			fmt.Println("Restarting container ", containers[id].ID[:12])
-			err := docker.ContainerRestart(context.Background(), containers[id].ID[:12], &duration)
-			if err != nil {
-				fmt.Println("ERROR: ", err)
+			a.DockerCLI.mux.Lock()
+			info, _ := docker.ContainerInspect(context.Background(), containers[id])
+			a.DockerCLI.mux.Unlock()
+			if container.Labels["protected"] != "true" {
+				fmt.Println("Restarting container ", containers[id].ID[:12])
+				err := docker.ContainerRestart(context.Background(), containers[id].ID[:12], &duration)
+				if err != nil {
+					fmt.Println("ERROR: ", err)
+				}
 			}
 			i = i + 1
+
 		}
 	}
 }
