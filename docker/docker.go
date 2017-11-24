@@ -22,6 +22,7 @@ var (
 	docker      *client.Client //FIXME: we could only use PumbaCLI, which also instantiate a DockerCLI
 	pumbaChaos  pumba.Chaos
 	pumbaClient container.Client
+	Debug       bool
 )
 
 type DockerCLI struct {
@@ -38,6 +39,19 @@ func (c *DockerCLI) NewDockerCLI() { //FIXME: we could only use PumbaCLI, which 
 		cli, err := client.NewEnvClient()
 		if err != nil {
 			panic(err)
+		}
+		if Debug {
+			events, errors := cli.Events(context.Background(), types.EventsOptions{})
+			go func() {
+				for {
+					select {
+					case ev := <-events:
+						fmt.Println("DOCKER-INFO:", ev)
+					case err := <-errors:
+						fmt.Println("DOCKER-ERRO:", err)
+					}
+				}
+			}()
 		}
 		docker = cli
 	}
@@ -281,7 +295,9 @@ func (a RestartContainer) Do(v int64) {
 		a.NewDockerCLI()
 	}
 
+	a.DockerCLI.mux.Lock()
 	containers, err := docker.ContainerList(context.Background(), types.ContainerListOptions{})
+	a.DockerCLI.mux.Unlock()
 	if err != nil {
 		panic(err)
 	}
@@ -291,19 +307,59 @@ func (a RestartContainer) Do(v int64) {
 		duration := 2 * time.Second
 		var i int64 = 0
 		for i < v {
-			id := r.Int() % len(containers) //FIXME: ensure that we get different IDs (currently, could be n times the same)
-			a.DockerCLI.mux.Lock()
-			info, _ := docker.ContainerInspect(context.Background(), containers[id])
-			a.DockerCLI.mux.Unlock()
-			if container.Labels["protected"] != "true" {
+			id := r.Int() % len(containers)                   //FIXME: ensure that we get different IDs (currently, could be n times the same)
+			if containers[id].Labels["protected"] == "true" { //Note: there is a tiny chance it will loop forever, if random keeps on choosing protected containers...
+				continue
+			} else {
 				fmt.Println("Restarting container ", containers[id].ID[:12])
+				a.DockerCLI.mux.Lock()
 				err := docker.ContainerRestart(context.Background(), containers[id].ID[:12], &duration)
+				a.DockerCLI.mux.Unlock()
 				if err != nil {
 					fmt.Println("ERROR: ", err)
 				}
+				i = i + 1
+			}
+		}
+	}
+}
+
+/*Scale a service with v up or down (v could be positive or negative)*/
+type ScaleService struct {
+	actions.Action
+	DockerCLI
+}
+
+func (a ScaleService) Do(v int64) {
+	if docker == nil {
+		a.NewDockerCLI()
+	}
+
+	a.DockerCLI.mux.Lock()
+	services, err := docker.ServiceList(context.Background(), types.ServiceListOptions{})
+	a.DockerCLI.mux.Unlock()
+	if err != nil {
+		panic(err)
+	}
+
+	if len(services) > 0 {
+		r := rand.New(rand.NewSource(time.Now().UnixNano()))
+		//duration := 2 * time.Second
+		var i int64 = 0
+		for i < v {
+			id := r.Int() % len(services) //FIXME: ensure that we get different IDs (currently, could be n times the same)
+			fmt.Println("Scaling service ", services[id].ID[:12])
+			a.DockerCLI.mux.Lock()
+
+			//TODO: figure out how to scale services...
+			//docker.ServiceUpdate(context.Background(), services[id].ID[:12], swarm.Version{Index: 3,}, service swarm.ServiceSpec, options types.ServiceUpdateOptions) (types.ServiceUpdateResponse, error)
+
+			//err := docker.ContainerRestart(context.Background(), containers[id].ID[:12], &duration)
+			a.DockerCLI.mux.Unlock()
+			if err != nil {
+				fmt.Println("ERROR: ", err)
 			}
 			i = i + 1
-
 		}
 	}
 }
