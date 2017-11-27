@@ -9,12 +9,12 @@ import (
 )
 
 func main() {
-	docker.Debug = true
+	docker.Debug = false
 
-	var sine1 signal.Signal = signal.Sine{
+	/*var sine1 signal.Signal = signal.Sine{
 		PeriodicSignal: signal.PeriodicSignal{
 			Period:     300 * time.Second,
-			Amplitude:  1000,
+			Amplitude:  10000,
 			Offset:     0,
 			Duty_cycle: 1,
 		},
@@ -42,6 +42,15 @@ func main() {
 		PeriodicSignal: signal.PeriodicSignal{
 			Period:     600 * time.Second,
 			Amplitude:  4,
+			Offset:     0, //for scaling services up and down, offset should be initial number of instances so as to move around this initial value
+			Duty_cycle: 1,
+		},
+	}*/
+
+	var sine5 signal.Signal = signal.Sine{
+		PeriodicSignal: signal.PeriodicSignal{
+			Period:     180 * time.Second,
+			Amplitude:  9,
 			Offset:     1, //for scaling services up and down, offset should be initial number of instances so as to move around this initial value
 			Duty_cycle: 1,
 		},
@@ -50,36 +59,42 @@ func main() {
 	fmt.Println("Starting...")
 	done := make(chan bool)
 
-	var networkRate docker.NetworkRate
+	/*var networkRate docker.NetworkRate
 	var packetLoss docker.PacketLoss
 	var packetDelay docker.PacketDelay
-	var restartContainer docker.RestartContainer
+	var restartContainer docker.RestartContainer*/
+	var scaleService docker.ScaleService
 
-	var sampler1 = signal.NewChaosMonkey(&sine1, 30*time.Second, &networkRate)
+	/*var sampler1 = signal.NewChaosMonkey(&sine1, 30*time.Second, &networkRate).Init()
 	c1 := make(chan signal.Sample)
-	var sampler2 = signal.NewChaosMonkey(&sine2, 90*time.Second, &packetLoss)
+	var sampler2 = signal.NewChaosMonkey(&sine2, 90*time.Second, &packetLoss).Init()
 	c2 := make(chan signal.Sample)
-	var sampler3 = signal.NewChaosMonkey(&sine3, 50*time.Second, &packetDelay)
+	var sampler3 = signal.NewChaosMonkey(&sine3, 50*time.Second, &packetDelay).Init()
 	c3 := make(chan signal.Sample)
-	var sampler4 = signal.NewChaosMonkey(&sine4, 180*time.Second, &restartContainer)
-	c4 := make(chan signal.Sample)
+	var sampler4 = signal.NewChaosMonkey(&sine4, 180*time.Second, &restartContainer).Init()
+	c4 := make(chan signal.Sample)*/
+	var sampler5 = signal.NewChaosMonkey(&sine5, 10*time.Second, &scaleService).Init()
+	c5 := make(chan signal.Sample)
 
-	go sampler1.Start(c1, &done)
+	/*go sampler1.Start(c1, &done)
 	go sampler2.Start(c2, &done)
 	go sampler3.Start(c3, &done)
-	go sampler4.Start(c4, &done)
+	go sampler4.Start(c4, &done)*/
+	go sampler5.Start(c5, &done)
 
 	go func() {
 		for {
 			select {
-			case s1 := <-c1:
+			/*case s1 := <-c1:
 				fmt.Println(time.Now().Unix(), ": Network Rate", s1)
 			case s2 := <-c2:
 				fmt.Println(time.Now().Unix(), ": Packet Loss", s2)
 			case s3 := <-c3:
 				fmt.Println(time.Now().Unix(), ": Packet delay", s3)
 			case s4 := <-c4:
-				fmt.Println(time.Now().Unix(), ": Container restart", s4)
+				fmt.Println(time.Now().Unix(), ": Container restart", s4)*/
+			case s5 := <-c5:
+				fmt.Println(time.Now().Unix(), ": Service scale", s5)
 			}
 		}
 	}()

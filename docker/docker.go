@@ -1,9 +1,11 @@
 package docker
 
 import (
+	"bytes"
 	"fmt"
 	"math/rand"
 	"net"
+	"os/exec"
 	"sync"
 	"time"
 
@@ -343,24 +345,28 @@ func (a ScaleService) Do(v int64) {
 	}
 
 	if len(services) > 0 {
+		var id int
 		r := rand.New(rand.NewSource(time.Now().UnixNano()))
-		//duration := 2 * time.Second
-		var i int64 = 0
-		for i < v {
-			id := r.Int() % len(services) //FIXME: ensure that we get different IDs (currently, could be n times the same)
-			fmt.Println("Scaling service ", services[id].ID[:12])
-			a.DockerCLI.mux.Lock()
-
-			//TODO: figure out how to scale services...
-			//docker.ServiceUpdate(context.Background(), services[id].ID[:12], swarm.Version{Index: 3,}, service swarm.ServiceSpec, options types.ServiceUpdateOptions) (types.ServiceUpdateResponse, error)
-
-			//err := docker.ContainerRestart(context.Background(), containers[id].ID[:12], &duration)
-			a.DockerCLI.mux.Unlock()
-			if err != nil {
-				fmt.Println("ERROR: ", err)
+		for { //Find one random service that is not protected
+			id = r.Int() % len(services)
+			if services[id].Spec.TaskTemplate.ContainerSpec.Labels["protected"] != "true" {
+				break
 			}
-			i = i + 1
 		}
+
+		name := services[id].Spec.Name
+		fmt.Println("Scaling service ", name)
+
+		//FIXME: figure out how to do it with the SDK. We just use os/exec meanwhile...
+
+		cmd := exec.Command("docker", "service", "scale", fmt.Sprintf("%s=%d", name, v))
+		var out bytes.Buffer
+		cmd.Stdout = &out
+		err := cmd.Run()
+		if err != nil {
+			fmt.Println("ERROR: ", err)
+		}
+		fmt.Printf("debug: %q\n", out.String())
 	}
 }
 
