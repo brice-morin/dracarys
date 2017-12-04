@@ -1,7 +1,10 @@
 package signal
 
 import (
+	"bytes"
 	"container/ring"
+	"fmt"
+	"os"
 	"time"
 
 	"../actions"
@@ -12,20 +15,21 @@ type Sample struct {
 	v int64
 }
 
+//TODO: add the possibility to have several signals, typically one for #containers to impact, and one for duration
 type ChaosMonkey struct {
 	samples *ring.Ring
 	Signal
-	Rate time.Duration
-	actions.IAction
+	Rate   time.Duration
+	Action actions.IAction
 	Ticker *time.Ticker
 }
 
-func NewChaosMonkey(sig *Signal, r time.Duration, a actions.IAction) *ChaosMonkey {
+func NewChaosMonkey(sig *Signal, r time.Duration, a actions.IAction /*docker.DockerAction*/) *ChaosMonkey {
 	a.SetTick(r)
 	var sampler ChaosMonkey = ChaosMonkey{
-		Signal:  *sig,
-		Rate:    r,
-		IAction: a,
+		Signal: *sig,
+		Rate:   r,
+		Action: a,
 	}
 	return &sampler
 }
@@ -35,10 +39,47 @@ func (s *ChaosMonkey) Init() ChaosMonkey {
 	s.samples = ring.New(size)
 	for i := 0; i < int(s.Signal.GetPeriod().Seconds()); i = i + int(s.Rate.Seconds()) {
 		s.samples.Value = s.Signal.Sample(int64(i))
+		fmt.Println("Sampling signal[", i, "]", s.samples.Value)
 		s.samples = s.samples.Next()
 	}
 	s.Signal = nil
 	return *s
+}
+
+func (s *ChaosMonkey) GenerateScript(path string) {
+	var buffer bytes.Buffer
+	buffer.WriteString("#! /bin/bash\n")
+	buffer.WriteString("declare -a samples=(")
+	for i := 0; i < int(s.Signal.GetPeriod().Seconds()); i = i + int(s.Rate.Seconds()) {
+		if i > 0 {
+			buffer.WriteString(" ")
+		}
+		buffer.WriteString(fmt.Sprintf("%d", s.Signal.Sample(int64(i))))
+	}
+	buffer.WriteString(")\n")
+	buffer.WriteString("while true; do\n")
+	buffer.WriteString("  for sample in \"${samples[@]}\"; do\n")
+	buffer.WriteString("    echo $sample\n")
+	buffer.WriteString("    for container in `docker ps -q --format \"{{.Names}}\"\"$@\"`; do\n")
+	buffer.WriteString("      if " + s.Action.Print() + " ; then\n")
+	buffer.WriteString("        printf -v ts '%(%s)T' -1\n")
+	buffer.WriteString("        echo \"" + s.Action.Print() + " #$ts\" >> dracarys.log\n") //FIXME: escape in action
+	buffer.WriteString("      fi\n")
+	buffer.WriteString("		done\n")
+	buffer.WriteString(fmt.Sprintf("    sleep %ds\n", int64(s.Rate.Seconds())))
+	buffer.WriteString("  done\n")
+	buffer.WriteString("done\n")
+
+	file, err := os.OpenFile(
+		path,
+		os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
+		0777,
+	)
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+	defer file.Close()
+	file.Write(buffer.Bytes())
 }
 
 func (s *ChaosMonkey) Start(c chan Sample, done *chan bool) {
@@ -48,12 +89,11 @@ func (s *ChaosMonkey) Start(c chan Sample, done *chan bool) {
 		ts := t.Unix() - now
 		v := s.samples.Value.(int64)
 		s.samples = s.samples.Next()
-		//v := s.Signal.Sample(ts)
-		s.IAction.Do(v)
+		fmt.Println("Tick[", ts, "]:", v)
+		go s.Action.Do(v)
 		c <- Sample{
 			ts,
 			v,
-			//s.Signal.Sample(ts),
 		}
 	}
 	*done <- true

@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"time"
 
-	"./docker"
+	"./actions"
 	"./signal"
 )
 
 func main() {
-	docker.Debug = false
+	actions.Debug = false
 
 	/*var sine1 signal.Signal = signal.Sine{
 		PeriodicSignal: signal.PeriodicSignal{
@@ -36,69 +36,86 @@ func main() {
 			Offset:     0,
 			Duty_cycle: 0.75,
 		},
-	}
+	}*/
 
-	var sine4 signal.Signal = signal.Sine{
+	/*var sine4 signal.Signal = signal.Sine{
 		PeriodicSignal: signal.PeriodicSignal{
 			Period:     600 * time.Second,
-			Amplitude:  4,
-			Offset:     0, //for scaling services up and down, offset should be initial number of instances so as to move around this initial value
+			Amplitude:  1000,
+			Offset:     1, //for scaling services up and down, offset should be initial number of instances so as to move around this initial value
 			Duty_cycle: 1,
 		},
 	}*/
 
 	var sine5 signal.Signal = signal.Sine{
 		PeriodicSignal: signal.PeriodicSignal{
-			Period:     180 * time.Second,
-			Amplitude:  9,
-			Offset:     1, //for scaling services up and down, offset should be initial number of instances so as to move around this initial value
-			Duty_cycle: 1,
+			Period:     300 * time.Second,
+			Amplitude:  30,
+			Offset:     0, //for scaling services up and down, offset should be initial number of instances so as to move around this initial value
+			Duty_cycle: 0.6,
 		},
 	}
 
+	/*var sine6 signal.Signal = signal.Sine{
+		PeriodicSignal: signal.PeriodicSignal{
+			Period:     180 * time.Second,
+			Amplitude:  20,
+			Offset:     0, //for scaling services up and down, offset should be initial number of instances so as to move around this initial value
+			Duty_cycle: 0.75,
+		},
+	}*/
+
 	fmt.Println("Starting...")
-	done := make(chan bool)
+	//done := make(chan bool)
 
 	/*var networkRate docker.NetworkRate
 	var packetLoss docker.PacketLoss
 	var packetDelay docker.PacketDelay
 	var restartContainer docker.RestartContainer*/
-	var scaleService docker.ScaleService
+	var stressContainer actions.IAction = &actions.StressContainer{Resource: "cpu"}
+	/*var stressContainer2 actions.IAction = &actions.StressContainer{Resource: "vm"}
+	var stressContainer3 actions.IAction = &actions.StressContainer{Resource: "io"}
+	var stressContainer4 actions.IAction = &actions.StressContainer{Resource: "hdd"}*/
 
-	/*var sampler1 = signal.NewChaosMonkey(&sine1, 30*time.Second, &networkRate).Init()
-	c1 := make(chan signal.Sample)
-	var sampler2 = signal.NewChaosMonkey(&sine2, 90*time.Second, &packetLoss).Init()
+	//var networkRate actions.IAction = &actions.NetworkRate{}
+
+	var sampler = signal.NewChaosMonkey(&sine5, 30*time.Second, stressContainer)
+	//c := make(chan signal.Sample)
+	/*var sampler2 = signal.NewChaosMonkey(&sine5, 30*time.Second, stressContainer2).Init()
 	c2 := make(chan signal.Sample)
-	var sampler3 = signal.NewChaosMonkey(&sine3, 50*time.Second, &packetDelay).Init()
+	var sampler3 = signal.NewChaosMonkey(&sine5, 30*time.Second, stressContainer3).Init()
 	c3 := make(chan signal.Sample)
-	var sampler4 = signal.NewChaosMonkey(&sine4, 180*time.Second, &restartContainer).Init()
+	var sampler4 = signal.NewChaosMonkey(&sine5, 30*time.Second, stressContainer4).Init()
 	c4 := make(chan signal.Sample)*/
-	var sampler5 = signal.NewChaosMonkey(&sine5, 10*time.Second, &scaleService).Init()
-	c5 := make(chan signal.Sample)
 
-	/*go sampler1.Start(c1, &done)
+	/*var sampler5 = signal.NewChaosMonkey(&sine4, 10*time.Second, networkRate).Init()
+	c5 := make(chan signal.Sample)*/
+
+	sampler.GenerateScript("sampler.sh")
+	/*go sampler.Start(c, &done)
 	go sampler2.Start(c2, &done)
 	go sampler3.Start(c3, &done)
-	go sampler4.Start(c4, &done)*/
+	go sampler4.Start(c4, &done)
+
 	go sampler5.Start(c5, &done)
 
 	go func() {
 		for {
 			select {
-			/*case s1 := <-c1:
-				fmt.Println(time.Now().Unix(), ": Network Rate", s1)
+			case s := <-c:
+				fmt.Println(time.Now().Unix(), ": Stress container", s)
 			case s2 := <-c2:
-				fmt.Println(time.Now().Unix(), ": Packet Loss", s2)
+				fmt.Println(time.Now().Unix(), ": Stress container2", s2)
 			case s3 := <-c3:
-				fmt.Println(time.Now().Unix(), ": Packet delay", s3)
+				fmt.Println(time.Now().Unix(), ": Stress container3", s3)
 			case s4 := <-c4:
-				fmt.Println(time.Now().Unix(), ": Container restart", s4)*/
+				fmt.Println(time.Now().Unix(), ": Stress container4", s4)
 			case s5 := <-c5:
-				fmt.Println(time.Now().Unix(), ": Service scale", s5)
+				fmt.Println(time.Now().Unix(), ": Network rate", s5)
 			}
 		}
 	}()
 
-	<-done //Wait for chaos monkeys to terminate (never)
+	<-done //Wait for chaos monkeys to terminate (never)*/
 
 }
