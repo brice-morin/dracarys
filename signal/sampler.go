@@ -49,6 +49,24 @@ func (s *ChaosMonkey) Init() ChaosMonkey {
 func (s *ChaosMonkey) GenerateScript(path string) {
 	var buffer bytes.Buffer
 	buffer.WriteString("#! /bin/bash\n")
+	buffer.WriteString("alive=true\n")
+	buffer.WriteString("_term(){\n")
+	buffer.WriteString("alive=false\n")
+	buffer.WriteString("  echo \"Waiting " + fmt.Sprintf("%ds", int64(s.Rate.Seconds())) + "for processes to terminate...\"\n")
+	buffer.WriteString(fmt.Sprintf("  sleep %ds\n", int64(s.Rate.Seconds())))
+	buffer.WriteString("  for job in `jobs -p`\n")
+	buffer.WriteString("  do\n")
+	buffer.WriteString("    echo $job\n")
+	buffer.WriteString("    wait $job\n")
+	buffer.WriteString("  done\n")
+	//TODO: add cleaning operations (restablishing containers in a decent state when we will the script)
+	//NOTE: though ideally, operations will leave the container in its initial state after they finish, so stopping the while loop and waiting for processes should be OK...
+	buffer.WriteString("  echo \"The End.\"\n")
+	buffer.WriteString("  exit\n")
+	buffer.WriteString("}\n\n")
+
+	buffer.WriteString("trap _term INT\n\n")
+
 	buffer.WriteString("declare -a samples=(")
 	for i := 0; i < int(s.Signal.GetPeriod().Seconds()); i = i + int(s.Rate.Seconds()) {
 		if i > 0 {
@@ -57,14 +75,14 @@ func (s *ChaosMonkey) GenerateScript(path string) {
 		buffer.WriteString(fmt.Sprintf("%d", s.Signal.Sample(int64(i))))
 	}
 	buffer.WriteString(")\n")
-	buffer.WriteString("while true; do\n")
+	buffer.WriteString("while $alive; do\n")
 	buffer.WriteString("  for sample in \"${samples[@]}\"; do\n")
 	buffer.WriteString("    echo $sample\n")
-	buffer.WriteString("    for container in `docker ps -q --format \"{{.Names}}\"\"$@\"`; do\n")
-	buffer.WriteString("      if " + s.Action.Print() + " ; then\n")
+	buffer.WriteString("    for container in `docker ps -q --format \"{{.Names}}\" --filter \"label=dracarys=true\"\"$@\"`; do\n")
+	buffer.WriteString("      (if " + s.Action.Print() + " ; then\n")
 	buffer.WriteString("        printf -v ts '%(%s)T' -1\n")
 	buffer.WriteString("        echo \"" + s.Action.Print() + " #$ts\" >> dracarys.log\n") //FIXME: escape in action
-	buffer.WriteString("      fi\n")
+	buffer.WriteString("      fi)&\n")
 	buffer.WriteString("		done\n")
 	buffer.WriteString(fmt.Sprintf("    sleep %ds\n", int64(s.Rate.Seconds())))
 	buffer.WriteString("  done\n")

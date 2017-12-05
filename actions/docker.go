@@ -196,6 +196,10 @@ type NetworkRate struct {
 	PumbaCLI
 }
 
+func (a *NetworkRate) Print() string {
+	return fmt.Sprintf("pumba netem --duration %ds --interface eth0 rate --rate ${sample}kbit $container", int64(a.GetTick().Seconds()))
+}
+
 func (a *NetworkRate) _do(v int64, do func(int64, string)) {
 	a.DockerAction._do(v, a.DoTo)
 }

@@ -38,14 +38,14 @@ func main() {
 		},
 	}*/
 
-	/*var sine4 signal.Signal = signal.Sine{
+	var sine4 signal.Signal = signal.Sine{
 		PeriodicSignal: signal.PeriodicSignal{
 			Period:     600 * time.Second,
 			Amplitude:  1000,
 			Offset:     1, //for scaling services up and down, offset should be initial number of instances so as to move around this initial value
 			Duty_cycle: 1,
 		},
-	}*/
+	}
 
 	var sine5 signal.Signal = signal.Sine{
 		PeriodicSignal: signal.PeriodicSignal{
@@ -77,7 +77,7 @@ func main() {
 	var stressContainer3 actions.IAction = &actions.StressContainer{Resource: "io"}
 	var stressContainer4 actions.IAction = &actions.StressContainer{Resource: "hdd"}*/
 
-	//var networkRate actions.IAction = &actions.NetworkRate{}
+	var networkRate actions.IAction = &actions.NetworkRate{}
 
 	var sampler = signal.NewChaosMonkey(&sine5, 30*time.Second, stressContainer)
 	//c := make(chan signal.Sample)
@@ -88,10 +88,11 @@ func main() {
 	var sampler4 = signal.NewChaosMonkey(&sine5, 30*time.Second, stressContainer4).Init()
 	c4 := make(chan signal.Sample)*/
 
-	/*var sampler5 = signal.NewChaosMonkey(&sine4, 10*time.Second, networkRate).Init()
-	c5 := make(chan signal.Sample)*/
+	var sampler5 = signal.NewChaosMonkey(&sine4, 10*time.Second, networkRate)
+	//c5 := make(chan signal.Sample)
 
 	sampler.GenerateScript("sampler.sh")
+	sampler5.GenerateScript("sampler5.sh")
 	/*go sampler.Start(c, &done)
 	go sampler2.Start(c2, &done)
 	go sampler3.Start(c3, &done)
