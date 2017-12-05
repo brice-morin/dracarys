@@ -34,24 +34,12 @@ func NewChaosMonkey(sig *Signal, r time.Duration, a actions.IAction /*docker.Doc
 	return &sampler
 }
 
-func (s *ChaosMonkey) Init() ChaosMonkey {
-	size := int(s.Signal.GetPeriod().Seconds()) / int(s.Rate.Seconds())
-	s.samples = ring.New(size)
-	for i := 0; i < int(s.Signal.GetPeriod().Seconds()); i = i + int(s.Rate.Seconds()) {
-		s.samples.Value = s.Signal.Sample(int64(i))
-		fmt.Println("Sampling signal[", i, "]", s.samples.Value)
-		s.samples = s.samples.Next()
-	}
-	s.Signal = nil
-	return *s
-}
-
 func (s *ChaosMonkey) GenerateScript(path string) {
 	var buffer bytes.Buffer
 	buffer.WriteString("#! /bin/bash\n")
 	buffer.WriteString("alive=true\n")
 	buffer.WriteString("_term(){\n")
-	buffer.WriteString("alive=false\n")
+	buffer.WriteString("  alive=false\n")
 	buffer.WriteString("  echo \"Waiting " + fmt.Sprintf("%ds", int64(s.Rate.Seconds())) + "for processes to terminate...\"\n")
 	buffer.WriteString(fmt.Sprintf("  sleep %ds\n", int64(s.Rate.Seconds())))
 	buffer.WriteString("  for job in `jobs -p`\n")
@@ -67,6 +55,7 @@ func (s *ChaosMonkey) GenerateScript(path string) {
 
 	buffer.WriteString("trap _term INT\n\n")
 
+	// buffer.WriteString("exec 8>.dracarys.lock\n")
 	buffer.WriteString("declare -a samples=(")
 	for i := 0; i < int(s.Signal.GetPeriod().Seconds()); i = i + int(s.Rate.Seconds()) {
 		if i > 0 {
@@ -77,12 +66,15 @@ func (s *ChaosMonkey) GenerateScript(path string) {
 	buffer.WriteString(")\n")
 	buffer.WriteString("while $alive; do\n")
 	buffer.WriteString("  for sample in \"${samples[@]}\"; do\n")
-	buffer.WriteString("    echo $sample\n")
-	buffer.WriteString("    for container in `docker ps -q --format \"{{.Names}}\" --filter \"label=dracarys=true\"\"$@\"`; do\n")
+	buffer.WriteString("    #echo $sample\n")
+	buffer.WriteString("    mapfile -t containers < <(docker ps -q --format \"{{.Names}}\"\n") //TODO --filter "label=dracarys=true"
+	buffer.WriteString("    for (( i=0; i<${#containers[@]}; i++ )); do\n")
+	// buffer.WriteString("    for i in $(shuf --input-range=0-$(( ${#containers[@]} - 1 )) -n ${sample}); do\n") //TODO generate that for actions that applies to a subset of the containers
+	buffer.WriteString("      container=${containers[i]}\n")
 	buffer.WriteString("      (if " + s.Action.Print() + " ; then\n")
 	buffer.WriteString("        printf -v ts '%(%s)T' -1\n")
-	buffer.WriteString("        echo \"" + s.Action.Print() + " #$ts\" >> dracarys.log\n") //FIXME: escape in action
-	buffer.WriteString("      fi)&\n")
+	buffer.WriteString("        echo \"" + s.Action.Print() + " #$ts\" >> " + path + ".log\n") //FIXME: escape in action
+	buffer.WriteString("      fi\n")
 	buffer.WriteString("		done\n")
 	buffer.WriteString(fmt.Sprintf("    sleep %ds\n", int64(s.Rate.Seconds())))
 	buffer.WriteString("  done\n")
@@ -98,25 +90,4 @@ func (s *ChaosMonkey) GenerateScript(path string) {
 	}
 	defer file.Close()
 	file.Write(buffer.Bytes())
-}
-
-func (s *ChaosMonkey) Start(c chan Sample, done *chan bool) {
-	var now int64 = time.Now().Unix()
-	s.Ticker = time.NewTicker(s.Rate)
-	for t := range s.Ticker.C {
-		ts := t.Unix() - now
-		v := s.samples.Value.(int64)
-		s.samples = s.samples.Next()
-		fmt.Println("Tick[", ts, "]:", v)
-		go s.Action.Do(v)
-		c <- Sample{
-			ts,
-			v,
-		}
-	}
-	*done <- true
-}
-
-func (s *ChaosMonkey) Stop() {
-	s.Ticker.Stop()
 }
