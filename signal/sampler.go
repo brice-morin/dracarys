@@ -69,7 +69,7 @@ func (s *ChaosMonkey) GenerateScript(path string) {
 	buffer.WriteString("    #echo $sample\n")
 	buffer.WriteString("    mapfile -t containers < <(docker ps -q --format \"{{.Names}}\"\n") //TODO --filter "label=dracarys=true"
 	buffer.WriteString("    for (( i=0; i<${#containers[@]}; i++ )); do\n")
-	// buffer.WriteString("    for i in $(shuf --input-range=0-$(( ${#containers[@]} - 1 )) -n ${sample}); do\n") //TODO generate that for actions that applies to a subset of the containers
+	// buffer.WriteString("    for i in $(shuf --input-range=0-$(( ${#containers[@]} - 1 )) -n ${sample}); do #takes a subset of size $sample of the containers\n") //TODO generate that for actions that applies to a subset of the containers
 	buffer.WriteString("      container=${containers[i]}\n")
 	buffer.WriteString("      (if " + s.Action.Print() + " ; then\n")
 	buffer.WriteString("        printf -v ts '%(%s)T' -1\n")
