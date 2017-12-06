@@ -26,11 +26,13 @@ Dracarys allows you to specify chaos scenarios that are:
 - yet with a degree of random
 - easy to correlate with measured metrics
 
-## Used Libraries
+## Used Tools
 
-- Docker API
-- Pumba. As the original Pumba is an app, I am currently using my fork, which can be used as a lib.
+- Docker.
+- Pumba, wrapping the `tc` (traffic control) utility in a usable way
+- `stress` utility, to load CPU, IO, RAM, HDD
 - Vegeta (soon) or maybe Gatling as an alternative/complement. Wait, no, Gatling is implemented in Scala...
+- CrashCart (soon) as a clean mean to load and unload sidekick containers
 
 ## License
 
