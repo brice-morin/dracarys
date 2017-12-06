@@ -28,8 +28,8 @@ Dracarys allows you to specify chaos scenarios that are:
 
 ## Used Tools
 
-- Docker.
-- Pumba, wrapping the `tc` (traffic control) utility in a usable way
+- Docker to deploy, kill, restart containers, scale in/out services, disconnect/reconnect network...
+- Pumba, wrapping the `tc` (traffic control) utility in a usable and Docker-friendly way to mess with the nework (loss, delay, etc)
 - `stress` utility, to load CPU, IO, RAM, HDD
 - Vegeta (soon) or maybe Gatling as an alternative/complement. Wait, no, Gatling is implemented in Scala...
 - CrashCart (soon) as a clean mean to load and unload sidekick containers
