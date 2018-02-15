@@ -88,10 +88,6 @@ func generateSamples(buffer *bytes.Buffer, s *ChaosMonkey) {
 		}
 		buffer.WriteString(strings.Join(values, " "))
 		buffer.WriteString(")\n")
-		buffer.WriteString("function _" + name + " {\n")
-		buffer.WriteString("local " + name + "=${all_" + name + "[$1]}\n")
-		buffer.WriteString("echo $" + name + "\n")
-		buffer.WriteString("}\n\n")
 	}
 }
 
@@ -141,7 +137,7 @@ func generateApplyToTargets(buffer *bytes.Buffer, s *ChaosMonkey) {
 	values := ""
 	for _, v := range s.Action.GetVariables() {
 		name := strings.Replace(v.Name, "-", "_", -1)
-		buffer.WriteString("      " + name + "=$(_" + name + " $index%${#all_" + name + "[@]})\n")
+		buffer.WriteString("      " + name + "=${all_" + name + "[$index%${#all_" + name + "[@]}]}\n")
 		values += "${" + name + "},"
 	}
 	buffer.WriteString("      error=`" + s.Action.Print() + " 2>&1 >/dev/null" + "`\n")
