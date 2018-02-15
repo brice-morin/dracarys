@@ -2,11 +2,30 @@ package actions
 
 import (
 	"fmt"
+	"strings"
 )
 
 var (
 	Debug bool
 )
+
+/*Limits quota allocated to a container*/
+type LimitContainer struct {
+	Action
+	AsInt bool
+}
+
+func (a *LimitContainer) Default() IAction {
+	a.SetScope(ALL)
+	a.SetType(CONTAINER)
+	return a
+}
+
+func (a *LimitContainer) Print() string {
+	v := a.GetVariables()[0]
+	name := strings.Replace(v.Name, "-", "_", -1)
+	return fmt.Sprintf("docker update --%s ${%s}%s $target", v.Name, name, v.Unit)
+}
 
 /*Stresses a container by generating CPU, RAM, IO and HDD activities for v seconds*/
 type StressContainer struct {
@@ -16,12 +35,13 @@ type StressContainer struct {
 
 func (a *StressContainer) Default() IAction {
 	a.SetScope(ALL)
-	a.SetTarget(CONTAINER)
+	a.SetType(CONTAINER)
 	return a
 }
 
 func (a *StressContainer) Print() string {
-	return fmt.Sprintf("docker exec -d $container stress --%s 16 --timeout ${sample}s --verbose", a.Resource)
+	v := a.GetVariables()[0]
+	return fmt.Sprintf("docker exec -d $target stress --%s 2 --timeout ${%s}s --verbose", v.Name, v.Name)
 }
 
 /*Limit network rate to  v kbit/s for traffic  on all containers*/
@@ -31,7 +51,7 @@ type NetworkRate struct {
 
 func (a *NetworkRate) Default() IAction {
 	a.SetScope(ALL)
-	a.SetTarget(CONTAINER)
+	a.SetType(CONTAINER)
 	return a
 }
 
@@ -46,7 +66,7 @@ type PacketDelay struct {
 
 func (a *PacketDelay) Default() IAction {
 	a.SetScope(ALL)
-	a.SetTarget(CONTAINER)
+	a.SetType(CONTAINER)
 	return a
 }
 
@@ -61,7 +81,7 @@ type PacketLoss struct {
 
 func (a *PacketLoss) Default() IAction {
 	a.SetScope(ALL)
-	a.SetTarget(CONTAINER)
+	a.SetType(CONTAINER)
 	return a
 }
 
@@ -76,7 +96,7 @@ type KillContainer struct {
 
 func (a *KillContainer) Default() IAction {
 	a.SetScope(RND)
-	a.SetTarget(CONTAINER)
+	a.SetType(CONTAINER)
 	return a
 }
 
@@ -91,7 +111,7 @@ type RestartContainer struct {
 
 func (a *RestartContainer) Default() IAction {
 	a.SetScope(RND)
-	a.SetTarget(CONTAINER)
+	a.SetType(CONTAINER)
 	return a
 }
 
@@ -106,7 +126,7 @@ type ScaleService struct {
 
 func (a *ScaleService) Default() IAction {
 	a.SetScope(RND)
-	a.SetTarget(SERVICE)
+	a.SetType(SERVICE)
 	return a
 }
 
@@ -121,18 +141,18 @@ type NetworkDisconnect struct {
 
 func (a *NetworkDisconnect) Default() IAction {
 	a.SetScope(RND)
-	a.SetTarget(CONTAINER)
+	a.SetType(CONTAINER)
 	return a
 }
 
 func (a *NetworkDisconnect) PrintHelper() string {
 	return "#$1 container, $2 duration\nfunction _disconnect {\n" +
-		"  container = $1\n" +
-		"  duration = $2\n" +
+		"  container=$1\n" +
+		"  duration=$2\n" +
 		"  mapfile -t networks < <(docker inspect --format='{{range .NetworkSettings.Networks}}{{.NetworkID}}{{end}}' $container)\n" +
 		"  for (( i=0; i<${#networks[@]}; i++ )); do\n" +
 		"    (docker network disconnect ${networks[i]} $container\n" +
-		"    sleep ${duration}s" +
+		"    sleep ${duration}s\n" +
 		"    docker network connect ${networks[i]} $container)&\n" +
 		"  done\n" +
 		"}\n"

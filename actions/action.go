@@ -2,13 +2,15 @@ package actions
 
 import (
 	"time"
+
+	v "../variable"
 )
 
-type Target uint8
+type Type uint8
 type Scope uint8
 
 const (
-	CONTAINER Target = iota
+	CONTAINER Type = iota
 	SERVICE
 	NETWORK
 )
@@ -25,19 +27,22 @@ type IAction interface {
 	SetTick(time.Duration)
 	GetScope() Scope
 	SetScope(Scope)
-	GetTarget() Target
-	SetTarget(Target)
+	GetType() Type
+	SetType(Type)
 	Print() string
 	PrintHelper() string
-	GetResources() []string
-	AddResource(string)
+	GetTargets() []string
+	AddTarget(string)
+	GetVariables() []*v.Variable
+	AddVariable(*v.Variable)
 }
 
 type Action struct {
-	Target    Target
+	Type      Type
 	Scope     Scope
 	Duration  time.Duration
-	Resources []string
+	Variables []*v.Variable
+	Targets   []string
 }
 
 func (a *Action) PrintHelper() string {
@@ -52,12 +57,12 @@ func (a *Action) GetTick() time.Duration {
 	return a.Duration
 }
 
-func (a *Action) SetTarget(t Target) {
-	a.Target = t
+func (a *Action) SetType(t Type) {
+	a.Type = t
 }
 
-func (a *Action) GetTarget() Target {
-	return a.Target
+func (a *Action) GetType() Type {
+	return a.Type
 }
 
 func (a *Action) SetScope(s Scope) {
@@ -68,15 +73,22 @@ func (a *Action) GetScope() Scope {
 	return a.Scope
 }
 
-func (a *Action) AddResource(r string) {
+func (a *Action) AddTarget(r string) {
 	if a.Scope == SOME {
-		a.Resources = append(a.Resources, r)
+		a.Targets = append(a.Targets, r)
+	} else {
+		panic(a)
 	}
 }
 
-func (a *Action) GetResources() []string {
-	if a.Scope == SOME {
-		return a.Resources
-	}
-	return nil
+func (a *Action) GetTargets() []string {
+	return a.Targets
+}
+
+func (a *Action) AddVariable(v *v.Variable) {
+	a.Variables = append(a.Variables, v)
+}
+
+func (a *Action) GetVariables() []*v.Variable {
+	return a.Variables
 }
