@@ -16,6 +16,7 @@ type LimitContainer struct {
 }
 
 func (a *LimitContainer) Default() IAction {
+	a.Output = "/dev/null"
 	a.SetScope(ALL)
 	a.SetType(CONTAINER)
 	return a
@@ -34,6 +35,7 @@ type StressContainer struct {
 }
 
 func (a *StressContainer) Default() IAction {
+	a.Output = "/dev/null"
 	a.SetScope(ALL)
 	a.SetType(CONTAINER)
 	return a
@@ -50,6 +52,7 @@ type NetworkRate struct {
 }
 
 func (a *NetworkRate) Default() IAction {
+	a.Output = "/dev/null"
 	a.SetScope(ALL)
 	a.SetType(CONTAINER)
 	return a
@@ -65,6 +68,7 @@ type PacketDelay struct {
 }
 
 func (a *PacketDelay) Default() IAction {
+	a.Output = "/dev/null"
 	a.SetScope(ALL)
 	a.SetType(CONTAINER)
 	return a
@@ -80,6 +84,7 @@ type PacketLoss struct {
 }
 
 func (a *PacketLoss) Default() IAction {
+	a.Output = "/dev/null"
 	a.SetScope(ALL)
 	a.SetType(CONTAINER)
 	return a
@@ -95,6 +100,7 @@ type KillContainer struct {
 }
 
 func (a *KillContainer) Default() IAction {
+	a.Output = "/dev/null"
 	a.SetScope(RND)
 	a.SetType(CONTAINER)
 	return a
@@ -110,6 +116,7 @@ type RestartContainer struct {
 }
 
 func (a *RestartContainer) Default() IAction {
+	a.Output = "/dev/null"
 	a.SetScope(RND)
 	a.SetType(CONTAINER)
 	return a
@@ -125,6 +132,7 @@ type ScaleService struct {
 }
 
 func (a *ScaleService) Default() IAction {
+	a.Output = "/dev/null"
 	a.SetScope(RND)
 	a.SetType(SERVICE)
 	return a
@@ -140,6 +148,7 @@ type NetworkDisconnect struct {
 }
 
 func (a *NetworkDisconnect) Default() IAction {
+	a.Output = "/dev/null"
 	a.SetScope(RND)
 	a.SetType(CONTAINER)
 	return a

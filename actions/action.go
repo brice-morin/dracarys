@@ -29,6 +29,8 @@ type IAction interface {
 	SetScope(Scope)
 	GetType() Type
 	SetType(Type)
+	GetOutput() string
+	SetOutput(string)
 	Print() string
 	PrintHelper() string
 	GetTargets() []string
@@ -43,6 +45,7 @@ type Action struct {
 	Duration  time.Duration
 	Variables []*v.Variable
 	Targets   []string
+	Output    string
 }
 
 func (a *Action) PrintHelper() string {
@@ -63,6 +66,14 @@ func (a *Action) SetType(t Type) {
 
 func (a *Action) GetType() Type {
 	return a.Type
+}
+
+func (a *Action) SetOutput(o string) {
+	a.Output = o
+}
+
+func (a *Action) GetOutput() string {
+	return a.Output
 }
 
 func (a *Action) SetScope(s Scope) {

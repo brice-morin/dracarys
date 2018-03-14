@@ -93,14 +93,7 @@ func generateSamples(buffer *bytes.Buffer, s *ChaosMonkey) {
 
 func generateTargets(buffer *bytes.Buffer, a actions.IAction) {
 	if a.GetScope() == actions.SOME {
-		switch a.GetType() {
-		case actions.CONTAINER:
-			buffer.WriteString("declare -a containers=(" + printTargets(a) + ")\n")
-		case actions.NETWORK:
-			buffer.WriteString("declare -a networks=(" + printTargets(a) + ")\n")
-		case actions.SERVICE:
-			buffer.WriteString("declare -a services=(" + printTargets(a) + ")\n")
-		}
+		buffer.WriteString("declare -a targets=(" + printTargets(a) + ")\n")
 	}
 }
 
@@ -140,7 +133,7 @@ func generateApplyToTargets(buffer *bytes.Buffer, s *ChaosMonkey) {
 		buffer.WriteString("      " + name + "=${all_" + name + "[$index%${#all_" + name + "[@]}]}\n")
 		values += "${" + name + "},"
 	}
-	buffer.WriteString("      error=`" + s.Action.Print() + " 2>&1 >/dev/null" + "`\n")
+	buffer.WriteString("      error=`" + s.Action.Print() + " 2>&1 >> " + s.Action.GetOutput() + "`\n")
 	buffer.WriteString("      printf -v ts '%(%s)T' -1\n")
 	buffer.WriteString("      if [ $? -eq 0 ]; then\n")
 	buffer.WriteString("        echo \"$ts," + s.Action.Print() + ",${error}\" >> " + s.Name + ".log\n")
