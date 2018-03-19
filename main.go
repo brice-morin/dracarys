@@ -16,17 +16,17 @@ func main() {
 	ram := v.Variable{Name: "memory", Unit: "m"}
 	io := v.Variable{Name: "blkio-weight"}
 
-	var sine1 signal.Signal = signal.SineFloat{ //Stress CPU, RAM, HDD, IO, with phase shift
+	var sine1 signal.Signal = signal.WaveletFloat{ //Stress CPU, RAM, HDD, IO, with phase shift
 		PeriodicSignal: signal.PeriodicSignal{
-			Period:    50 * time.Second,
-			Amplitude: 0.95,
-			Offset:    0.05,
+			Period:    60 * time.Second,
+			Amplitude: 100,
+			Offset:    0,
 			DutyCycle: 1,
 			Variable:  &cpu,
 		},
 	}
 
-	var sine2 signal.Signal = signal.SineFloat{ //Stress CPU, RAM, HDD, IO, with phase shift
+	var sine2 signal.Signal = signal.WaveletFloat{ //Stress CPU, RAM, HDD, IO, with phase shift
 		PeriodicSignal: signal.PeriodicSignal{
 			Period:    60 * time.Second,
 			Amplitude: 60,
@@ -36,7 +36,7 @@ func main() {
 		},
 	}
 
-	var sine3 signal.Signal = signal.Sine{ //Stress CPU, RAM, HDD, IO, with phase shift
+	var sine3 signal.Signal = signal.WaveletFloat{ //Stress CPU, RAM, HDD, IO, with phase shift
 		PeriodicSignal: signal.PeriodicSignal{
 			Period:    70 * time.Second,
 			Amplitude: 990,
@@ -64,7 +64,7 @@ func main() {
 	keyset := v.Variable{Name: "keyset"}
 	pipeline := v.Variable{Name: "pipeline"}
 
-	var redissine1 signal.Signal = signal.Sine{ //Stress CPU, RAM, HDD, IO, with phase shift
+	var redissine1 signal.Signal = signal.WaveletFloat{ //Stress CPU, RAM, HDD, IO, with phase shift
 		PeriodicSignal: signal.PeriodicSignal{
 			Period:    50 * time.Second,
 			Amplitude: 250,
@@ -74,7 +74,7 @@ func main() {
 		},
 	}
 
-	var redissine2 signal.Signal = signal.Sine{ //Stress CPU, RAM, HDD, IO, with phase shift
+	var redissine2 signal.Signal = signal.WaveletFloat{ //Stress CPU, RAM, HDD, IO, with phase shift
 		PeriodicSignal: signal.PeriodicSignal{
 			Period:    15 * time.Second,
 			Amplitude: 10,
@@ -84,7 +84,7 @@ func main() {
 		},
 	}
 
-	var redissine3 signal.Signal = signal.Sine{ //Stress CPU, RAM, HDD, IO, with phase shift
+	var redissine3 signal.Signal = signal.WaveletFloat{ //Stress CPU, RAM, HDD, IO, with phase shift
 		PeriodicSignal: signal.PeriodicSignal{
 			Period:    70 * time.Second,
 			Amplitude: 1000,
@@ -94,7 +94,7 @@ func main() {
 		},
 	}
 
-	var redissine4 signal.Signal = signal.Sine{ //Stress CPU, RAM, HDD, IO, with phase shift
+	var redissine4 signal.Signal = signal.WaveletFloat{ //Stress CPU, RAM, HDD, IO, with phase shift
 		PeriodicSignal: signal.PeriodicSignal{
 			Period:    60 * time.Second,
 			Amplitude: 100,
@@ -113,11 +113,11 @@ func main() {
 	redisBench.AddVariable(&pipeline)
 
 	var manager = signal.NewManager("main")
-	manager.AddMonkey(signal.NewChaosMonkey("sampler1", append([]*signal.Signal{}, &sine1), 0*time.Second, 5*time.Second, stressContainer))
-	manager.AddMonkey(signal.NewChaosMonkey("sampler2", append([]*signal.Signal{}, &sine2), 25*time.Second, 5*time.Second, stressContainer2))
-	manager.AddMonkey(signal.NewChaosMonkey("sampler3", append([]*signal.Signal{}, &sine3), 50*time.Second, 5*time.Second, stressContainer3))
+	manager.AddMonkey(signal.NewChaosMonkey("sampler1", append([]*signal.Signal{}, &sine1), 0*time.Second, 1*time.Second, stressContainer))
+	manager.AddMonkey(signal.NewChaosMonkey("sampler2", append([]*signal.Signal{}, &sine2), 25*time.Second, 1*time.Second, stressContainer2))
+	manager.AddMonkey(signal.NewChaosMonkey("sampler3", append([]*signal.Signal{}, &sine3), 50*time.Second, 1*time.Second, stressContainer3))
 
-	manager.AddMonkey(signal.NewChaosMonkey("redisbench", append([]*signal.Signal{}, &redissine1, &redissine2, &redissine3, &redissine4), 0*time.Second, 2*time.Second, redisBench))
+	manager.AddMonkey(signal.NewChaosMonkey("redisbench", append([]*signal.Signal{}, &redissine1, &redissine2, &redissine3, &redissine4), 0*time.Second, 1*time.Second, redisBench))
 
 	manager.GenerateScripts()
 
