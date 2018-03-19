@@ -29,7 +29,7 @@ func main() {
 	var sine2 signal.Signal = signal.WaveletFloat{ //Stress CPU, RAM, HDD, IO, with phase shift
 		PeriodicSignal: signal.PeriodicSignal{
 			Period:    60 * time.Second,
-			Amplitude: 60,
+			Amplitude: 100,
 			Offset:    4,
 			DutyCycle: 1,
 			Variable:  &ram,
