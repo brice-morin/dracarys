@@ -19,6 +19,7 @@ const (
 	ALL Scope = iota
 	RND
 	SOME
+	NEW
 )
 
 type IAction interface {

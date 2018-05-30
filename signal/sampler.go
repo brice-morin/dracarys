@@ -98,35 +98,40 @@ func generateTargets(buffer *bytes.Buffer, a actions.IAction) {
 }
 
 func generateFindTarget(buffer *bytes.Buffer, s *ChaosMonkey) {
-	switch s.Action.GetType() {
-	case actions.CONTAINER:
-		if s.Action.GetScope() != actions.SOME {
-			buffer.WriteString("    mapfile -t targets < <(docker ps -q --format \"{{.Names}}\" --filter label=eu.stamp.dracarys=true)\n") //TODO --filter "label=dracarys=true"
+	if s.Action.GetScope() != actions.NEW {
+		switch s.Action.GetType() {
+		case actions.CONTAINER:
+			if s.Action.GetScope() != actions.SOME {
+				buffer.WriteString("    mapfile -t targets < <(docker ps -q --format \"{{.Names}}\" --filter label=eu.stamp.dracarys=true)\n") //TODO --filter "label=dracarys=true"
+			}
+		case actions.NETWORK:
+			if s.Action.GetScope() != actions.SOME {
+				buffer.WriteString("    mapfile -t targets < <(docker network ls -q --format \"{{.Name}}\")\n") //TODO --filter "label=dracarys=true"
+			}
+		case actions.SERVICE:
+			if s.Action.GetScope() != actions.SOME {
+				buffer.WriteString("    mapfile -t targets < <(docker service ls -q --format \"{{.Name}}\" --filter label=eu.stamp.dracarys=true)\n") //TODO --filter "label=dracarys=true"
+			}
 		}
-	case actions.NETWORK:
-		if s.Action.GetScope() != actions.SOME {
-			buffer.WriteString("    mapfile -t targets < <(docker network ls -q --format \"{{.Name}}\")\n") //TODO --filter "label=dracarys=true"
-		}
-	case actions.SERVICE:
-		if s.Action.GetScope() != actions.SOME {
-			buffer.WriteString("    mapfile -t targets < <(docker service ls -q --format \"{{.Name}}\" --filter label=eu.stamp.dracarys=true)\n") //TODO --filter "label=dracarys=true"
-		}
+		buffer.WriteString("    if [[ ${#targets[@]} -eq \"0\" ]]; then\n")
+		buffer.WriteString("      printf -v ts '%(%s)T' -1\n")
+		buffer.WriteString("      echo \"$ts,_,no target\" >> " + s.Name + ".log\n")
+		buffer.WriteString("      " + fmt.Sprintf("sleep %ds\n", int64(s.Rate.Seconds())))
+		buffer.WriteString("      continue\n")
+		buffer.WriteString("    fi\n")
 	}
-	buffer.WriteString("    if [[ ${#targets[@]} -eq \"0\" ]]; then\n")
-	buffer.WriteString("      printf -v ts '%(%s)T' -1\n")
-	buffer.WriteString("      echo \"$ts,_,no target\" >> " + s.Name + ".log\n")
-	buffer.WriteString("      " + fmt.Sprintf("sleep %ds\n", int64(s.Rate.Seconds())))
-	buffer.WriteString("      continue\n")
-	buffer.WriteString("    fi\n")
 }
 
 func generateApplyToTargets(buffer *bytes.Buffer, s *ChaosMonkey) {
-	if s.Action.GetScope() == actions.ALL || s.Action.GetScope() == actions.SOME {
-		buffer.WriteString("    for (( i=0; i<${#targets[@]}; i++ )); do\n")
-	} else {
-		buffer.WriteString("    for i in $(shuf --input-range=0-$(( ${#targets[@]} - 1 )) -n ${sample}); do #takes a subset of size $sample of the targets\n")
+	if s.Action.GetScope() != actions.NEW {
+		if s.Action.GetScope() == actions.ALL || s.Action.GetScope() == actions.SOME {
+			buffer.WriteString("    for (( i=0; i<${#targets[@]}; i++ )); do\n")
+		} else {
+			buffer.WriteString("    for i in $(shuf --input-range=0-$(( ${#targets[@]} - 1 )) -n ${sample}); do #takes a subset of size $sample of the targets\n")
+		}
+		buffer.WriteString("      target=${targets[i]}\n")
 	}
-	buffer.WriteString("      target=${targets[i]}\n")
+
 	values := ""
 	for _, v := range s.Action.GetVariables() {
 		name := strings.Replace(v.Name, "-", "_", -1)
@@ -141,8 +146,10 @@ func generateApplyToTargets(buffer *bytes.Buffer, s *ChaosMonkey) {
 	buffer.WriteString("      else\n")
 	buffer.WriteString("        echo \"$ts," + s.Action.Print() + ",${error}\" >> " + s.Name + ".log\n")
 	buffer.WriteString("      fi\n")
-	buffer.WriteString("		done\n")
 
+	if s.Action.GetScope() != actions.NEW {
+		buffer.WriteString("		done\n")
+	}
 }
 
 func (s *ChaosMonkey) GenerateScript() {
@@ -154,9 +161,20 @@ func (s *ChaosMonkey) GenerateScript() {
 
 	buffer.WriteString("index=0\n")
 	buffer.WriteString("while $alive; do\n")
+	buffer.WriteString("start=`date +\"%s\"`\n")
+
 	generateFindTarget(&buffer, s)
 	generateApplyToTargets(&buffer, s)
-	buffer.WriteString("    " + fmt.Sprintf("sleep %ds\n", int64(s.Rate.Seconds())))
+
+	buffer.WriteString("    stop=`date +\"%s\"`\n")
+	buffer.WriteString("    duration=$(( $stop-$start ))\n")
+	buffer.WriteString("    stop=`date +\"%s\"`\n")
+	buffer.WriteString("    " + fmt.Sprintf("sleep_time=$(( %d-$duration ))\n", int64(s.Rate.Seconds())))
+	buffer.WriteString("    while [ $sleep_time -lt \"0\" ]\n")
+	buffer.WriteString("    do\n")
+	buffer.WriteString("      " + fmt.Sprintf("duration=$(( $duration+%d ))\n", int64(s.Rate.Seconds())))
+	buffer.WriteString("    done\n")
+	buffer.WriteString("    sleep ${sleep_time}s\n")
 	buffer.WriteString("    ((index++))\n")
 	buffer.WriteString("done\n")
 

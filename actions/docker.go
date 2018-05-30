@@ -43,7 +43,7 @@ func (a *StressContainer) Default() IAction {
 
 func (a *StressContainer) Print() string {
 	v := a.GetVariables()[0]
-	return fmt.Sprintf("docker exec -d $target stress --%s 2 --timeout ${%s}s --verbose", v.Name, v.Name)
+	return fmt.Sprintf("docker run --rm bmorin/stress stress -%s 8 --timeout ${%s}s --verbose", v.Name, v.Name)
 }
 
 /*Limit network rate to  v kbit/s for traffic  on all containers*/
